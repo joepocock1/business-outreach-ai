@@ -1,0 +1,240 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  businessName  String?
+  portfolioUrl  String?
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  leads         Lead[]
+  campaigns     Campaign[]
+  templates     Template[]
+  insights      AIInsight[]
+}
+
+model Lead {
+  id            String    @id @default(cuid())
+  userId        String
+  businessName  String
+  contactName   String?
+  email         String
+  phone         String?
+  address       String?
+  industry      String?   // e.g., "Restaurant", "Contractor", "Retail"
+  tags          String[]  @default([])
+  status        String    @default("New") // New, Contacted, Responded, Qualified, Won, Lost
+  notes         String?
+  source        String?   // How you found them: "Manual", "CSV Import", "Google Maps"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails        Email[]
+  campaignLeads CampaignLead[]
+
+  @@unique([userId, email])
+  @@index([userId, status])
+  @@index([userId, industry])
+}
+
+model Template {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+
+  // Master template that AI will create variations from
+  masterSubject String
+  masterBody    String    // Can include variables: {{businessName}}, {{contactName}}, {{yourName}}, {{portfolioUrl}}
+
+  // Metadata
+  targetIndustry String?  // Which industry this works best for
+  tone          String    @default("professional") // professional, casual, friendly
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns     Campaign[]
+  variations    EmailVariation[]
+
+  @@index([userId])
+}
+
+model EmailVariation {
+  id            String    @id @default(cuid())
+  templateId    String
+
+  variationName String    // e.g., "PAS Format", "AIDA Format", "Direct Approach"
+  subject       String
+  bodyHtml      String
+  bodyText      String
+
+  // AI-generated metadata
+  copywritingFramework String // "PAS", "AIDA", "BAB", "FAB", "Direct"
+  estimatedLength      Int    // Word count
+  toneAnalysis         String? // AI's analysis of tone
+
+  // Performance tracking
+  timesSent     Int       @default(0)
+  timesOpened   Int       @default(0)
+  timesClicked  Int       @default(0)
+  timesReplied  Int       @default(0)
+
+  // Calculated metrics (updated via cron)
+  openRate      Float?
+  clickRate     Float?
+  replyRate     Float?
+
+  isActive      Boolean   @default(true)
+  isWinner      Boolean   @default(false) // Marked as best performer
+
+  createdAt     DateTime  @default(now())
+
+  template      Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  emails        Email[]
+
+  @@index([templateId])
+  @@index([templateId, isActive])
+}
+
+model Campaign {
+  id            String    @id @default(cuid())
+  userId        String
+  templateId    String
+
+  name          String
+  description   String?
+
+  // Campaign settings
+  status        String    @default("Draft") // Draft, Scheduled, Active, Paused, Completed, Cancelled
+  sendingStrategy String  @default("balanced") // balanced (distribute variations evenly), winner_focused (send more of best performer)
+
+  // Scheduling
+  scheduledFor  DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  // Rate limiting
+  emailsPerHour Int       @default(10)
+  emailsPerDay  Int       @default(50)
+
+  // Send window (e.g., only 9am-5pm weekdays)
+  sendWindowStart Int     @default(9)  // Hour (24h format)
+  sendWindowEnd   Int     @default(17)
+  sendWeekdaysOnly Boolean @default(true)
+
+  // Performance summary (calculated)
+  totalLeads    Int       @default(0)
+  emailsSent    Int       @default(0)
+  emailsOpened  Int       @default(0)
+  emailsClicked Int       @default(0)
+  emailsReplied Int       @default(0)
+  emailsBounced Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template      Template  @relation(fields: [templateId], references: [id])
+  emails        Email[]
+  leadSelections CampaignLead[]
+
+  @@index([userId, status])
+  @@index([status])
+}
+
+model CampaignLead {
+  campaignId    String
+  leadId        String
+  addedAt       DateTime  @default(now())
+
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, leadId])
+}
+
+model Email {
+  id            String    @id @default(cuid())
+  leadId        String
+  campaignId    String?
+  variationId   String
+
+  // Email content (rendered with variables filled)
+  subject       String
+  bodyHtml      String
+  bodyText      String
+
+  // Sending status
+  status        String    @default("Queued") // Queued, Sending, Sent, Delivered, Opened, Clicked, Replied, Bounced, Failed, Unsubscribed
+
+  // Resend response data
+  resendId      String?   @unique
+
+  // Tracking
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  repliedAt     DateTime?
+  bouncedAt     DateTime?
+
+  // Error tracking
+  errorMessage  String?
+  retryCount    Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  variation     EmailVariation @relation(fields: [variationId], references: [id])
+
+  @@index([leadId])
+  @@index([campaignId, status])
+  @@index([status, sentAt])
+  @@index([resendId])
+}
+
+model Unsubscribe {
+  email         String    @id
+  reason        String?
+  unsubscribedAt DateTime @default(now())
+}
+
+model AIInsight {
+  id            String    @id @default(cuid())
+  userId        String
+
+  insightType   String    // "best_variation", "optimal_send_time", "subject_line_pattern", "industry_preference"
+  title         String
+  description   String
+  confidence    Float     // 0-1 score
+  dataPoints    Int       // How many emails this is based on
+
+  metadata      Json?     // Additional structured data
+
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, insightType])
+  @@index([userId, isActive])
+}
