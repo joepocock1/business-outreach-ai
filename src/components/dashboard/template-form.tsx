@@ -37,6 +37,8 @@ export function TemplateForm({ template, mode }: TemplateFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [body, setBody] = useState(template?.masterBody || "");
+  const [tone, setTone] = useState(template?.tone || "professional");
+  const [targetIndustry, setTargetIndustry] = useState(template?.targetIndustry || "__none__");
 
   const insertVariable = (variable: string) => {
     const textarea = document.getElementById("masterBody") as HTMLTextAreaElement;
@@ -65,8 +67,8 @@ export function TemplateForm({ template, mode }: TemplateFormProps) {
       description: (formData.get("description") as string) || undefined,
       masterSubject: formData.get("masterSubject") as string,
       masterBody: body,
-      targetIndustry: (formData.get("targetIndustry") as string) || undefined,
-      tone: (formData.get("tone") as TemplateInput["tone"]) || "professional",
+      targetIndustry: targetIndustry === "__none__" ? undefined : targetIndustry,
+      tone: tone as TemplateInput["tone"],
     };
 
     try {
@@ -118,14 +120,14 @@ export function TemplateForm({ template, mode }: TemplateFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="tone">Tone</Label>
-              <Select name="tone" defaultValue={template?.tone || "professional"}>
+              <Select value={tone} onValueChange={setTone}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
                 <SelectContent>
-                  {tones.map((tone) => (
-                    <SelectItem key={tone.value} value={tone.value}>
-                      {tone.label}
+                  {tones.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -146,15 +148,12 @@ export function TemplateForm({ template, mode }: TemplateFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="targetIndustry">Target Industry (Optional)</Label>
-            <Select
-              name="targetIndustry"
-              defaultValue={template?.targetIndustry || ""}
-            >
+            <Select value={targetIndustry} onValueChange={setTargetIndustry}>
               <SelectTrigger>
                 <SelectValue placeholder="All industries" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All industries</SelectItem>
+                <SelectItem value="__none__">All industries</SelectItem>
                 {industries.map((industry) => (
                   <SelectItem key={industry} value={industry}>
                     {industry}
