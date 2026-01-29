@@ -28,6 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { CampaignActions } from "@/components/dashboard/campaign-actions";
+import { CampaignEmailsTable } from "@/components/dashboard/campaign-emails-table";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Send }> = {
   Draft: { label: "Draft", color: "bg-gray-100 text-gray-800", icon: Clock },
@@ -282,7 +283,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         <CardHeader>
           <CardTitle>Recent Emails</CardTitle>
           <CardDescription>
-            Latest emails sent in this campaign.
+            Latest emails sent in this campaign. Click &quot;Mark Replied&quot; when a lead responds.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -291,37 +292,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               No emails have been sent yet.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Business</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Variation</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Sent</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaign.emails.map((email) => (
-                  <TableRow key={email.id}>
-                    <TableCell className="font-medium">{email.lead.businessName}</TableCell>
-                    <TableCell className="text-gray-500">{email.lead.email}</TableCell>
-                    <TableCell>{email.variation.variationName}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{email.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-500">
-                      {email.sentAt
-                        ? new Date(email.sentAt).toLocaleString("en-GB", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
-                        : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <CampaignEmailsTable emails={campaign.emails} />
           )}
         </CardContent>
       </Card>
