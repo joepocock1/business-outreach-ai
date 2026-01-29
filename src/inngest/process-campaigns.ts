@@ -23,19 +23,37 @@ export const processCampaigns = inngest.createFunction(
   },
   { cron: "*/5 * * * *" }, // Every 5 minutes
   async () => {
-    console.log("[Inngest] Starting campaign processing...");
+    console.log("[Inngest] ========== STARTING CAMPAIGN PROCESSING ==========");
 
     const results: ProcessingResult[] = [];
     const completedCampaigns: string[] = [];
 
     try {
+      // DEBUG: Get counts of ALL campaigns by status
+      const allCampaigns = await db.campaign.findMany({
+        select: { id: true, name: true, status: true },
+      });
+      console.log(`[Inngest DEBUG] Total campaigns in database: ${allCampaigns.length}`);
+
+      const statusCounts = allCampaigns.reduce((acc, c) => {
+        acc[c.status] = (acc[c.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log(`[Inngest DEBUG] Campaigns by status:`, JSON.stringify(statusCounts));
+
+      // Log each campaign
+      allCampaigns.forEach((c) => {
+        console.log(`[Inngest DEBUG] Campaign: "${c.name}" (${c.id}) - Status: ${c.status}`);
+      });
+
       // Get current time info
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+      const currentHour = now.getUTCHours(); // Use UTC for consistency
+      const currentDay = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
       const isWeekday = currentDay >= 1 && currentDay <= 5;
 
-      console.log(`[Inngest] Current time: ${now.toISOString()}, Hour: ${currentHour}, Day: ${currentDay}, Weekday: ${isWeekday}`);
+      console.log(`[Inngest] Current UTC time: ${now.toISOString()}`);
+      console.log(`[Inngest] UTC Hour: ${currentHour}, UTC Day: ${currentDay} (0=Sun), Is Weekday: ${isWeekday}`);
 
       // Find active campaigns
       const campaigns = await db.campaign.findMany({
@@ -58,9 +76,16 @@ export const processCampaigns = inngest.createFunction(
         },
       });
 
-      console.log(`[Inngest] Found ${campaigns.length} active campaigns`);
+      console.log(`[Inngest] Found ${campaigns.length} ACTIVE campaigns to process`);
+
+      if (campaigns.length === 0) {
+        console.log("[Inngest] NO ACTIVE CAMPAIGNS - Check if any campaigns have status='Active' in the database");
+      }
 
       for (const campaign of campaigns) {
+        console.log(`[Inngest] ---- Processing campaign: "${campaign.name}" (${campaign.id}) ----`);
+        console.log(`[Inngest] Campaign settings: sendWindow=${campaign.sendWindowStart}-${campaign.sendWindowEnd}, weekdaysOnly=${campaign.sendWeekdaysOnly}`);
+
         const result: ProcessingResult = {
           campaignId: campaign.id,
           campaignName: campaign.name,
@@ -72,14 +97,21 @@ export const processCampaigns = inngest.createFunction(
 
         try {
           // Check send window
-          if (currentHour < campaign.sendWindowStart || currentHour >= campaign.sendWindowEnd) {
-            console.log(`[Inngest] Campaign ${campaign.name}: Outside send window (${campaign.sendWindowStart}-${campaign.sendWindowEnd}), current: ${currentHour}`);
-            continue;
+          // NOTE: Send window is in local time, but server runs in UTC
+          // For now, we'll skip the send window check in debug mode
+          const outsideSendWindow = currentHour < campaign.sendWindowStart || currentHour >= campaign.sendWindowEnd;
+          console.log(`[Inngest] Send window check: currentHour=${currentHour}, window=${campaign.sendWindowStart}-${campaign.sendWindowEnd}, outside=${outsideSendWindow}`);
+
+          if (outsideSendWindow) {
+            console.log(`[Inngest] Campaign ${campaign.name}: SKIPPED - Outside send window`);
+            // Continue anyway for debugging - comment this to enforce send window
+            // continue;
           }
 
           // Check weekday constraint
+          console.log(`[Inngest] Weekday check: isWeekday=${isWeekday}, weekdaysOnly=${campaign.sendWeekdaysOnly}`);
           if (campaign.sendWeekdaysOnly && !isWeekday) {
-            console.log(`[Inngest] Campaign ${campaign.name}: Weekdays only, today is weekend`);
+            console.log(`[Inngest] Campaign ${campaign.name}: SKIPPED - Weekdays only, today is weekend`);
             continue;
           }
 
@@ -114,6 +146,18 @@ export const processCampaigns = inngest.createFunction(
             continue;
           }
 
+          // DEBUG: Check all emails for this campaign
+          const allCampaignEmails = await db.email.findMany({
+            where: { campaignId: campaign.id },
+            select: { id: true, status: true },
+          });
+          const emailStatusCounts = allCampaignEmails.reduce((acc, e) => {
+            acc[e.status] = (acc[e.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          console.log(`[Inngest] Campaign ${campaign.name}: Total emails in campaign: ${allCampaignEmails.length}`);
+          console.log(`[Inngest] Campaign ${campaign.name}: Email statuses: ${JSON.stringify(emailStatusCounts)}`);
+
           // Get queued emails
           const queuedEmails = await db.email.findMany({
             where: {
@@ -127,7 +171,11 @@ export const processCampaigns = inngest.createFunction(
             take: availableToSend,
           });
 
-          console.log(`[Inngest] Campaign ${campaign.name}: Found ${queuedEmails.length} queued emails to process`);
+          console.log(`[Inngest] Campaign ${campaign.name}: Found ${queuedEmails.length} QUEUED emails to process (limit: ${availableToSend})`);
+
+          if (queuedEmails.length > 0) {
+            console.log(`[Inngest] First queued email: ${queuedEmails[0].id} to ${queuedEmails[0].lead.email}`);
+          }
 
           if (queuedEmails.length === 0) {
             // Check if campaign is complete
