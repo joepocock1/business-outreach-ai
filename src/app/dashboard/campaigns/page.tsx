@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Send, Clock, CheckCircle, Pause } from "lucide-react";
+import { Plus, Send, Clock, CheckCircle, Pause, XCircle } from "lucide-react";
+import { CampaignActions } from "@/components/dashboard/campaign-actions";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Send }> = {
   Draft: { label: "Draft", color: "bg-gray-100 text-gray-800", icon: Clock },
@@ -14,7 +15,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   Active: { label: "Active", color: "bg-green-100 text-green-800", icon: Send },
   Paused: { label: "Paused", color: "bg-yellow-100 text-yellow-800", icon: Pause },
   Completed: { label: "Completed", color: "bg-purple-100 text-purple-800", icon: CheckCircle },
-  Cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800", icon: Clock },
+  Cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800", icon: XCircle },
 };
 
 export default async function CampaignsPage() {
@@ -82,21 +83,33 @@ export default async function CampaignsPage() {
               : 0;
 
             return (
-              <Link key={campaign.id} href={`/dashboard/campaigns/${campaign.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg line-clamp-1">{campaign.name}</CardTitle>
+              <Card key={campaign.id} className="hover:shadow-md transition-shadow h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/dashboard/campaigns/${campaign.id}`} className="flex-1 min-w-0">
+                      <CardTitle className="text-lg line-clamp-1 hover:text-blue-600 transition-colors">
+                        {campaign.name}
+                      </CardTitle>
+                    </Link>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <Badge className={status.color}>
                         <StatusIcon className="h-3 w-3 mr-1" />
                         {status.label}
                       </Badge>
+                      <CampaignActions
+                        campaignId={campaign.id}
+                        campaignName={campaign.name}
+                        status={campaign.status}
+                        variant="dropdown"
+                      />
                     </div>
-                    <CardDescription className="line-clamp-1">
-                      {campaign.template.name}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <CardDescription className="line-clamp-1">
+                    {campaign.template.name}
+                  </CardDescription>
+                </CardHeader>
+                <Link href={`/dashboard/campaigns/${campaign.id}`}>
+                  <CardContent className="cursor-pointer">
                     <div className="space-y-3">
                       {/* Progress bar */}
                       <div className="space-y-1">
@@ -129,8 +142,8 @@ export default async function CampaignsPage() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              </Link>
+                </Link>
+              </Card>
             );
           })}
         </div>

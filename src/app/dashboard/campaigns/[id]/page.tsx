@@ -25,7 +25,9 @@ import {
   MousePointerClick,
   MessageSquare,
   AlertCircle,
+  XCircle,
 } from "lucide-react";
+import { CampaignActions } from "@/components/dashboard/campaign-actions";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Send }> = {
   Draft: { label: "Draft", color: "bg-gray-100 text-gray-800", icon: Clock },
@@ -33,7 +35,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   Active: { label: "Active", color: "bg-green-100 text-green-800", icon: Send },
   Paused: { label: "Paused", color: "bg-yellow-100 text-yellow-800", icon: Pause },
   Completed: { label: "Completed", color: "bg-purple-100 text-purple-800", icon: CheckCircle },
-  Cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800", icon: AlertCircle },
+  Cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800", icon: XCircle },
 };
 
 interface CampaignDetailPageProps {
@@ -121,7 +123,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/dashboard/campaigns">
@@ -143,6 +145,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             </p>
           </div>
         </div>
+        <CampaignActions
+          campaignId={campaign.id}
+          campaignName={campaign.name}
+          status={campaign.status}
+          variant="buttons"
+        />
       </div>
 
       {/* Stats cards */}
