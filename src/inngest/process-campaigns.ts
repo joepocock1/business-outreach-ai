@@ -2,10 +2,9 @@ import { inngest } from "@/lib/inngest";
 import { db } from "@/lib/db";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
-const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
+// NOTE: Resend client and env vars must be read inside the function
+// because module-level code runs at build time in serverless environments
+// and env vars may not be available yet
 
 interface ProcessingResult {
   campaignId: string;
@@ -23,7 +22,16 @@ export const processCampaigns = inngest.createFunction(
   },
   { cron: "*/5 * * * *" }, // Every 5 minutes
   async () => {
+    // Read env vars inside the function (not at module load time)
+    // This is critical for serverless environments where env vars aren't available at build time
+    const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
+    const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
     console.log("[Inngest] ========== STARTING CAMPAIGN PROCESSING ==========");
+    console.log(`[Inngest] SENDER_EMAIL: ${SENDER_EMAIL}`);
+    console.log(`[Inngest] SENDER_NAME: ${SENDER_NAME}`);
+    console.log(`[Inngest] RESEND_API_KEY present: ${!!process.env.RESEND_API_KEY}`);
 
     const results: ProcessingResult[] = [];
     const completedCampaigns: string[] = [];

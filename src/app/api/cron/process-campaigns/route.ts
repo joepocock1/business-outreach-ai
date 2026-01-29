@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Get the configured sender email from env or use a default
-const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
-const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
-
 interface ProcessingResult {
   campaignId: string;
   campaignName: string;
@@ -18,6 +12,11 @@ interface ProcessingResult {
 }
 
 export async function GET(request: NextRequest) {
+  // Read env vars inside the function (not at module load time)
+  const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
+  const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   // Verify authorization
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;

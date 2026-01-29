@@ -4,12 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Get the configured sender email from env
-const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
-const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
-
 /**
  * Test endpoint to send a single email from an active campaign.
  * Useful for local testing without waiting for cron.
@@ -20,6 +14,14 @@ const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
  * If campaignId is not provided, picks the first active campaign.
  */
 export async function POST(request: NextRequest) {
+  // Read env vars inside the function (not at module load time)
+  const SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@resend.dev";
+  const SENDER_NAME = process.env.SENDER_NAME || "OutreachAI";
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  console.log(`[Test] SENDER_EMAIL: ${SENDER_EMAIL}`);
+  console.log(`[Test] SENDER_NAME: ${SENDER_NAME}`);
+
   // Only allow in development or with auth
   const session = await getServerSession(authOptions);
 
